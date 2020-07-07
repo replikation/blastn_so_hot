@@ -140,13 +140,8 @@ workflow {
     }
 
     if (params.fasta && params.references) {
-        //fasta_input_ch.view()
-        //references_input_ch.view()
-
-
         plot_blast_output_wf(blast_against_own_DB_wf(fasta_input_ch, make_blast_DB(references_input_ch)))
     }
-
 }
 
 /*************  
