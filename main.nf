@@ -1,13 +1,21 @@
 #!/usr/bin/env nextflow
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 /*
 * Author: christian.jena@gmail.com
 */
 
-if ( !nextflow.version.matches('20.+') ) {
-    println "This workflow requires Nextflow version 20.X or greater -- You are running version $nextflow.version"
-    exit 1
+XX = "21"
+YY = "04"
+ZZ = "0"
+
+if ( nextflow.version.toString().tokenize('.')[0].toInteger() < XX.toInteger() ) {
+println "\033[0;33mporeCov requires at least Nextflow version " + XX + "." + YY + "." + ZZ + " -- You are using version $nextflow.version\u001B[0m"
+exit 1
+}
+else if ( nextflow.version.toString().tokenize('.')[1].toInteger() == XX.toInteger() && nextflow.version.toString().tokenize('.')[1].toInteger() < YY.toInteger() ) {
+println "\033[0;33mporeCov requires at least Nextflow version " + XX + "." + YY + "." + ZZ + " -- You are using version $nextflow.version\u001B[0m"
+exit 1
 }
 
 if (params.help) { exit 0, helpMSG() }
