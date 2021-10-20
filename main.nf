@@ -100,9 +100,9 @@ if ( !params.fasta ) {
 * MODULES
 *************/
 
-include blastn_NCBI from './modules/blastn_NCBI' 
+include { blastn_NCBI } from './modules/blastn_NCBI' 
 include { makeblastDB; blastn_local } from './modules/blast' 
-include plot_xml from './modules/plot_xml' 
+include { plot_xml } from './modules/plot_xml' 
 
 /************* 
 * DATABASES
