@@ -1,5 +1,4 @@
 process plot_xml {
-        echo true
         label 'altair'
         publishDir "${params.output}/${name}/", mode: 'copy'
     input:

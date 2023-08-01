@@ -1,14 +1,10 @@
 #!/usr/bin/env nextflow
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 /*
 * Author: christian.jena@gmail.com
 */
 
-if ( !nextflow.version.matches('20.+') ) {
-    println "This workflow requires Nextflow version 20.X or greater -- You are running version $nextflow.version"
-    exit 1
-}
 
 if (params.help) { exit 0, helpMSG() }
 
@@ -63,27 +59,14 @@ if ( !params.fasta ) {
 *************/
 
 // fasta input or via csv file
-    if (params.fasta && params.list) { 
-        fasta_input_ch = Channel
-        .fromPath( params.fasta, checkIfExists: true )
-        .splitCsv()
-        .map { row -> ["${row[0]}", file("${row[1]}", checkIfExists: true)] }
-    }
-    else if (params.fasta) { 
+    if (params.fasta) { 
         fasta_input_ch = Channel
         .fromPath( params.fasta, checkIfExists: true)
         .map { file -> tuple(file.baseName, file) }
-        .view()
     }
 
 // references
-    if (params.references && params.list) { 
-        references_input_ch = Channel
-        .fromPath( params.references, checkIfExists: true )
-        .splitCsv()
-        .map { row -> [file("${row[0]}", checkIfExists: true)] }
-    }
-    else if (params.references) { 
+    if (params.references) { 
         references_input_ch = Channel
         .fromPath( params.references, checkIfExists: true)
     }
@@ -92,9 +75,10 @@ if ( !params.fasta ) {
 * MODULES
 *************/
 
-include blastn_NCBI from './modules/blastn_NCBI' 
-include { makeblastDB; blastn_local } from './modules/blast' 
-include plot_xml from './modules/plot_xml' 
+include { blastn_NCBI                       } from './modules/blastn_NCBI' 
+include { makeblastDB; blastn_local         } from './modules/blast' 
+include { plot_xml                          } from './modules/plot_xml' 
+include { split_multi_fasta                 } from './modules/split_multi_fasta'
 
 /************* 
 * DATABASES
@@ -110,16 +94,41 @@ workflow make_blast_DB {
 * SUB WORKFLOWS
 *************/  
 
+
+
 workflow blast_against_NCBI_wf {
     take:   fasta
-    main:   blastn_NCBI(fasta)
-    emit:   blastn_NCBI.out
+    main:   if (params.multifasta) {
+                split_multi_fasta(fasta)
+                mapped_channel=split_multi_fasta.out.flatten().map{it -> [it.baseName, it]}
+                blastn_NCBI(mapped_channel)
+
+                // report
+                report_ch = blastn_NCBI.out.status.view { name, status -> "$name got NCBI response: $status" }
+
+            }
+            else {
+                blastn_NCBI(fasta)
+
+                report_ch = blastn_NCBI.out.status.view { name, status -> "$name got NCBI response: $status" }
+            
+            }
+    
+            
+    emit:   blastn_NCBI.out.xml
 }
 
 workflow blast_against_own_DB_wf {
     take:   fasta
             database
-    main:   blastn_local(fasta, database)
+    main:   if (params.multifasta) {
+                split_multi_fasta(fasta)
+                mapped_channel=split_multi_fasta.out.flatten().view() //.map { it -> tuple(it[1].baseName, it[1]) }
+                blastn_local(mapped_channel, database)
+            }
+            else {
+                blastn_local(fasta, database)
+            }
     emit:   blastn_local.out
 }
 
@@ -173,7 +182,7 @@ def helpMSG() {
     ${c_yellow}Parameters${c_reset}
     --eValue        (not implemented)
     --hsplength     (not implemented)
-    --multifasta    (not implemented)  
+    --multifasta    multifasta file, analysed each sequence separately 
 
 
     ${c_yellow}Options:${c_reset}

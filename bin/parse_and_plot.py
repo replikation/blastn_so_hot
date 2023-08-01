@@ -73,7 +73,7 @@ render = alt.Chart(source).mark_bar(opacity=0.8).encode(
     #x='hsp_start:Q',
     x= alt.X('hsp_start:Q', title='Length in bp'),
     x2='hsp_end:Q',
-    y=alt.Y('Hit_def:N', axis=y_axis),
+    y=alt.Y('Hit_ID:N', axis=y_axis),
    
     color=alt.Color(
         'Hsp_num:N',
