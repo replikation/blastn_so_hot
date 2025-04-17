@@ -8,3 +8,5 @@ work/
 results/
 .Rhistory
 singularity_images/
+test-results/
+test_fastas/

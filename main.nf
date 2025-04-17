@@ -62,96 +62,43 @@ if ( !params.fasta ) {
     if (params.fasta) { 
         fasta_input_ch = Channel
         .fromPath( params.fasta, checkIfExists: true)
-        .map { file -> tuple(file.baseName, file) }
+        .map { file -> tuple(file.baseName, file) }   
     }
+    else { fasta_input_ch = Channel.empty() } 
 
 // references
     if (params.references) { 
         references_input_ch = Channel
         .fromPath( params.references, checkIfExists: true)
     }
+    else { references_input_ch = Channel.empty() }
 
 /************* 
-* MODULES
+* Workflows
 *************/
 
-include { blastn_NCBI                       } from './modules/blastn_NCBI' 
-include { makeblastDB; blastn_local         } from './modules/blast' 
-include { plot_xml                          } from './modules/plot_xml' 
-include { split_multi_fasta                 } from './modules/split_multi_fasta'
-
-/************* 
-* DATABASES
-*************/
-
-workflow make_blast_DB {
-    take:   references
-    main:   makeblastDB(references)   
-    emit:   makeblastDB.out
-}
-
-/************* 
-* SUB WORKFLOWS
-*************/  
+include { make_blast_DB_wf } from './workflows/blast_wf.nf'
+include { blast_against_NCBI_wf } from './workflows/blast_wf.nf'
+include { blast_against_own_DB_wf } from './workflows/blast_wf.nf'
+include { plot_blast_output_wf } from './workflows/blast_wf.nf'
 
 
-
-workflow blast_against_NCBI_wf {
-    take:   fasta
-    main:   if (params.multifasta) {
-                split_multi_fasta(fasta)
-                mapped_channel=split_multi_fasta.out.flatten().map{it -> [it.baseName, it]}
-                blastn_NCBI(mapped_channel)
-
-                // report
-                report_ch = blastn_NCBI.out.status.view { name, status -> "$name got NCBI response: $status" }
-
-            }
-            else {
-                blastn_NCBI(fasta)
-
-                report_ch = blastn_NCBI.out.status.view { name, status -> "$name got NCBI response: $status" }
-            
-            }
-    
-            
-    emit:   blastn_NCBI.out.xml
-}
-
-workflow blast_against_own_DB_wf {
-    take:   fasta
-            database
-    main:   if (params.multifasta) {
-                split_multi_fasta(fasta)
-                mapped_channel=split_multi_fasta.out.flatten().view() //.map { it -> tuple(it[1].baseName, it[1]) }
-                blastn_local(mapped_channel, database)
-            }
-            else {
-                blastn_local(fasta, database)
-            }
-    emit:   blastn_local.out
-}
-
-workflow plot_blast_output_wf {
-    take:   xml
-    main:   plot_xml(xml)   
-    emit:   plot_xml.out
-}
-
-/************* 
-* Main Workflow
-*************/ 
-
+/************************** 
+* MAIN WORKFLOW
+**************************/
 workflow {
-    if (params.fasta && !params.references) {
-        plot_blast_output_wf(
-            blast_against_NCBI_wf(fasta_input_ch))
-    }
+     
+        blast_against_NCBI_wf(fasta_input_ch)
 
-    if (params.fasta && params.references) {
-        plot_blast_output_wf(blast_against_own_DB_wf(fasta_input_ch, make_blast_DB(references_input_ch)))
-    }
+        blast_against_own_DB_wf(fasta_input_ch, make_blast_DB_wf(references_input_ch))
+
+        plotting_ch = blast_against_NCBI_wf.out
+                      .mix(blast_against_own_DB_wf.out)   // how does this channel look like
+        plotting_ch.view()
+        plot_blast_output_wf(plotting_ch)   
+
 }
+
 
 /*************  
 * --help
